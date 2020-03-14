@@ -25,6 +25,8 @@ This analysis takes a look at the number, the positive and negative sentiment, a
 
 I utilize open data hosted online. In particular, big thanks to [Alex Litel](https://github.com/alexlitel) who created the [Tweets of Congress](https://alexlitel.github.io/congresstweets/) repo, where I pulled congressional tweets from, and the folks running [Trump Twitter Archive](http://trumptwitterarchive.com/), where I pulled Trump's tweets from.
 
+The repo for this project is: [https://github.com/dcosme/congress-tweets-covid19](https://github.com/dcosme/congress-tweets-covid19)
+
 # prep data
 load packages
 
