@@ -34,8 +34,8 @@ load packages
 library(tidyverse)
 library(jsonlite)
 library(tidytext)
-library(wordcloud)
-library(webshot)
+library(ggwordcloud)
+library(knitr)
 ```
 
 define palettes
@@ -228,12 +228,12 @@ merge tweets
 tweets = bind_rows(congress_tweets, trump_tweets)
 
 ignore_root_words = "http|.com|img|jpg|video|live|index|[0-9]|corona|covid|vid|ncov|aspx|utm|t.co|png"
-ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s")
+ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s", "lr", "li", "ag")
 ```
 
 define wordcloud function
 ```{r}
-plot_tweets = function(data, party=NULL, start_date=NULL, duration=NULL, n_words=50, n_colors=6, size=.4) {
+plot_tweets = function(data, party=NULL, start_date=NULL, duration=NULL, n_words=50, n_colors=6, size=20) {
   
   data = data %>%
       mutate(time = lubridate::as_date(time))
@@ -255,25 +255,37 @@ plot_tweets = function(data, party=NULL, start_date=NULL, duration=NULL, n_words
   
   palette = wesanderson::wes_palette("Zissou1", n_colors, "continuous")
   
-  plot = data %>%
-    select(text) %>%
+  set.seed(42)
+  
+plot = data %>%
+    filter(party %in% c("democrat", "republican", "trump")) %>%
+    select(text, party) %>%
     unnest_tokens(word, text) %>%
+    group_by(party) %>%
     count(word, sort = TRUE) %>%
     anti_join(stop_words, by = "word") %>%
     filter(!grepl(ignore_root_words, word)) %>%
     filter(!word %in% ignore_words) %>%
     slice(1:n_words) %>%
-    mutate(color = ntile(n, n_colors)) %>%
-    mutate(color1 = plyr::mapvalues(color, from = 1:n_colors, to = palette)) %>%
-    wordcloud2::wordcloud2(., size = size, shape = 'rectangle',
-                          fontFamily = "futura", fontWeight = "normal",
-                          color = .$color1)
+    mutate(word = gsub("\\.", "", word),
+           sum = sum(n),
+           size = n / sum,
+           tile = ntile(n, n_colors)) %>%
+    ggplot(aes(label = word, size = size, color = as.factor(tile))) +
+    geom_text_wordcloud_area(shape = "square") +
+      scale_size_area(max_size = size, trans = power_trans(1/.7)) +
+      scale_color_manual(values = palette) +
+      facet_wrap(~party) +
+      theme_minimal() +
+      theme(strip.text.x = element_text(size = 12))
   
   return(list(plot = plot, data = data))
 }
 ```
 
 # number of tweets {.tabset}
+How many times has Congress and the President tweeted about COVID-19?
+
 ## daily
 ```{r}
 tweets %>%
@@ -317,6 +329,10 @@ tweets %>%
 ```
 
 # sentiment of tweets {.tabset}
+How positive and negative is the content of the tweets?
+
+Here is a list of the top 20 positive or negative words for each party and the President.
+
 ## overall
 ```{r, fig.width=8, fig.height=10}
 sentiments = tweets %>%
@@ -343,7 +359,7 @@ sentiments %>%
   labs(y = "\nnumber of times tweeted",
        x = NULL) +
   coord_flip() +
-  scale_fill_manual(values = palette2) +
+  scale_fill_manual(name = "", values = palette2) +
   theme_minimal(base_size = 14) +
   theme(legend.position = "top")
 ```
@@ -375,265 +391,117 @@ sentiments %>%
   labs(y = "\nnumber of times tweeted",
        x = NULL) +
   coord_flip() +
-  scale_fill_manual(values = palette2) +
+  scale_fill_manual(name = "", values = palette2) +
   theme_minimal(base_size = 14) +
   theme(legend.position = "top")
 
 ```
 
-# content by month
-## democrats {.tabset}
-### February
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-02-01", duration = 29, n_words = 100, size = .4)
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","dm1.png", vwidth = 500, vheight = 400, zoom = 2)
-```
+# content of tweets
+What are Congress and the President saying about COVID-19?
 
-Number of tweets = `r nrow(d$data)`
+Here are 100 the most frequently used words by each party and the President in February and March.
+
+## by month {.tabset}
+### February
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-02-01", duration = 29, n_words = 100)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
+```
 
 ### March
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-03-01", duration = 31, n_words = 100, size = .4)
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","dm2.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-03-01", duration = 31, n_words = 100)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
 
-Number of tweets = `r nrow(d$data)`
+## by week {.tabset}
+Here are 50 the most frequently used words by each party and the President for each week in February and March.
 
-## republicans {.tabset}
-### February
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-02-01", duration = 29, n_words = 100, size = .4)
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","rm1.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### March
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-03-01", duration = 31, n_words = 100, size = .4)
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","rm2.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-## trump {.tabset}
-### February
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-02-01", duration = 29, n_words = 100, size = .4)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","tm1.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### March
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-03-01", duration = 31, n_words = 100, size = .4)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","tm2.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-# content by week
-## democrats {.tabset}
 ### Feb 1 - Feb 7
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-02-01", duration = 7)
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d1.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-02-01", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
-
-Number of tweets = `r nrow(d$data)`
 
 ### Feb 8 - Feb 14
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-02-08", duration = 7)
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d2.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-02-08", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
-
-Number of tweets = `r nrow(d$data)`
 
 ### Feb 15 - Feb 20
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-02-15", duration = 7)
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d3.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-02-15", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
-
-Number of tweets = `r nrow(d$data)`
 
 ### Feb 20 - Feb 26
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-02-20", duration = 7)
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d4.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-02-20", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
-
-Number of tweets = `r nrow(d$data)`
 
 ### Feb 27 - Mar 4
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-02-27", duration = 7)
-
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d5.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-02-27", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
-
-Number of tweets = `r nrow(d$data)`
 
 ### Mar 5 - Mar 11
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-03-05", duration = 7)
-
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d6.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-03-05", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
-
-Number of tweets = `r nrow(d$data)`
 
 ### Mar 12 - Mar 18
-```{r}
-d = plot_tweets(tweets, party = "democrat", start_date = "2020-03-12", duration = 7)
-
-htmlwidgets::saveWidget(d$plot,"d.html", selfcontained = FALSE)
-webshot("d.html","d7.png", vwidth = 500, vheight = 400, zoom = 2)
+```{r, fig.width=8, fig.height=4}
+p = plot_tweets(tweets, start_date = "2020-03-12", duration = 7)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
 ```
 
-Number of tweets = `r nrow(d$data)`
-
-## republicans {.tabset}
-### Feb 1 - Feb 7
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-02-01", duration = 7)
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r1.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### Feb 8 - Feb 14
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-02-08", duration = 7, size = .3)
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r2.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### Feb 15 - Feb 20
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-02-15", duration = 7)
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r3.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### Feb 20 - Feb 26
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-02-20", duration = 7)
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r4.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### Feb 27 - Mar 4
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-02-27", duration = 7)
-
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r5.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### Mar 5 - Mar 11
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-03-05", duration = 7)
-
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r6.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-### Mar 12 - Mar 18
-```{r}
-r = plot_tweets(tweets, party = "republican", start_date = "2020-03-12", duration = 7)
-
-htmlwidgets::saveWidget(r$plot,"r.html", selfcontained = FALSE)
-webshot("r.html","r7.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(r$data)`
-
-## trump {.tabset}
-### Feb 1 - Feb 7
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-02-01", duration = 7)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t1.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### Feb 8 - Feb 14
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-02-08", duration = 7, size = .3)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t2.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### Feb 15 - Feb 20
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-02-15", duration = 7)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t3.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### Feb 20 - Feb 26
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-02-20", duration = 7)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t4.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### Feb 27 - Mar 4
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-02-27", duration = 7)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t5.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### Mar 5 - Mar 11
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-03-05", duration = 7)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t6.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
-
-### Mar 12 - Mar 18
-```{r}
-t = plot_tweets(tweets, party = "trump", start_date = "2020-03-12", duration = 7)
-htmlwidgets::saveWidget(t$plot,"t.html", selfcontained = FALSE)
-webshot("t.html","t7.png", vwidth = 500, vheight = 400, zoom = 2)
-```
-
-Number of tweets = `r nrow(t$data)`
