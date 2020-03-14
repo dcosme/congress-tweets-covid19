@@ -36,6 +36,7 @@ library(jsonlite)
 library(tidytext)
 library(ggwordcloud)
 library(knitr)
+library(DT)
 ```
 
 define palettes
@@ -216,7 +217,10 @@ trump_tweets = get_tweets(year = 2020) %>%
          time = lubridate::as_date(time),
          week = lubridate::floor_date(time, "week"),
          month = lubridate::floor_date(time, "month"),
-         party = "trump") %>%
+         party = "trump",
+         first = "D",
+         last = "trump",
+         title = "president") %>%
   select(twitter_handle, text, time, week, month, party) %>%
   filter(grepl("2020-02|2020-03", month)) %>%
   mutate(text = tolower(text)) %>%
@@ -288,44 +292,44 @@ How many times has Congress and the President tweeted about COVID-19?
 
 ## daily
 ```{r}
-tweets %>%
+ggplotly(tweets %>%
   filter(!is.na(party)) %>%
   ggplot(aes(time, fill = party)) +
   geom_bar(stat = "count") +
   scale_fill_manual(name = "", values = palette4) +
   labs(x = "", y = "number of tweets\n") +
   theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+  theme(legend.position = "top"))
 
-tweets %>%
+ggplotly(tweets %>%
   filter(!is.na(party)) %>%
   ggplot(aes(time, color = party)) +
   geom_line(stat = "count") +
   scale_color_manual(name = "", values = palette4) +
   labs(x = "", y = "number of tweets\n") +
   theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+  theme(legend.position = "top"))
 ```
 
 ## weekly
 ```{r}
-tweets %>%
+ggplotly(tweets %>%
   filter(!is.na(party)) %>%
   ggplot(aes(week, fill = party)) +
   geom_bar(stat = "count") +
   scale_fill_manual(name = "", values = palette4) +
   labs(x = "", y = "number of tweets\n") +
   theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+  theme(legend.position = "top"))
 
-tweets %>%
+ggplotly(tweets %>%
   filter(!is.na(party)) %>%
   ggplot(aes(week, color = party)) +
   geom_line(stat = "count") +
   scale_color_manual(name = "", values = palette4) +
   labs(x = "", y = "number of tweets\n") +
   theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+  theme(legend.position = "top"))
 ```
 
 # sentiment of tweets {.tabset}
@@ -351,7 +355,7 @@ sentiments = tweets %>%
   arrange(n) %>%
   mutate(order = row_number())
 
-sentiments %>%
+ggplotly(sentiments %>%
   ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
   geom_col() +
   drlib::scale_x_reordered() +
@@ -361,7 +365,7 @@ sentiments %>%
   coord_flip() +
   scale_fill_manual(name = "", values = palette2) +
   theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+  theme(legend.position = "top"))
 ```
 
 ## by month
@@ -383,7 +387,7 @@ sentiments = tweets %>%
   arrange(n) %>%
   mutate(order = row_number())
 
-sentiments %>%
+ggplotly(sentiments %>%
   ggplot(aes(drlib::reorder_within(word, n, c("party", "month")), n, fill = sentiment)) +
   geom_col() +
   drlib::scale_x_reordered() +
@@ -393,7 +397,7 @@ sentiments %>%
   coord_flip() +
   scale_fill_manual(name = "", values = palette2) +
   theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+  theme(legend.position = "top"))
 
 ```
 
@@ -503,5 +507,50 @@ p$data %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
+```
+
+# browse tweets {.tabset}
+## word counts
+
+Who's tweeting the most and what are they tweeting?
+
+```{r}
+tweets %>%
+  filter(!is.na(party)) %>%
+  select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, time, text) %>%
+  arrange(twitter_handle) %>%
+  unnest_tokens(word, text) %>%
+  group_by(state_name, title, first, last, twitter_handle, party, gender, ethnicity) %>%
+  count(word, sort = TRUE) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(!grepl(ignore_root_words, word)) %>%
+  filter(!word %in% ignore_words) %>%
+  ungroup() %>%
+  rename("state" = state_name,
+         "twitter handle" = twitter_handle) %>%
+  mutate(state = as.factor(state),
+         title = as.factor(title),
+         party = as.factor(party),
+         gender = as.factor(gender),
+         ethnicity = as.factor(ethnicity)) %>%
+  DT::datatable(filter = "top", rownames = FALSE)
+```
+
+## tweets
+Browse the content of all tweets.
+
+```{r}
+tweets %>%
+  select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, time, text) %>%
+  arrange(twitter_handle) %>%
+  rename("state" = state_name,
+         "twitter handle" = twitter_handle,
+         "date" = time) %>%
+  mutate(state = as.factor(state),
+         title = as.factor(title),
+         party = as.factor(party),
+         gender = as.factor(gender),
+         ethnicity = as.factor(ethnicity)) %>%
+  DT::datatable(filter = "top", rownames = FALSE)
 ```
 
