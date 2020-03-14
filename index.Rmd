@@ -405,7 +405,7 @@ Here are 100 the most frequently used words by each party and the President in F
 ## by month {.tabset}
 ### February
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-01", duration = 29, n_words = 100)
+p = plot_tweets(tweets, start_date = "2020-02-01", duration = 28, n_words = 100)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -416,7 +416,7 @@ p$data %>%
 
 ### March
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-03-01", duration = 31, n_words = 100)
+p = plot_tweets(tweets, start_date = "2020-03-01", duration = 30, n_words = 100)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -430,7 +430,7 @@ Here are 50 the most frequently used words by each party and the President for e
 
 ### Feb 1 - Feb 7
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-01", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-02-01", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -441,7 +441,7 @@ p$data %>%
 
 ### Feb 8 - Feb 14
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-08", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-02-08", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -450,9 +450,9 @@ p$data %>%
   kable(format = "pandoc")
 ```
 
-### Feb 15 - Feb 20
+### Feb 15 - Feb 21
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-15", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-02-15", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -461,9 +461,9 @@ p$data %>%
   kable(format = "pandoc")
 ```
 
-### Feb 20 - Feb 26
+### Feb 22 - Feb 28
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-20", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-02-22", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -472,9 +472,9 @@ p$data %>%
   kable(format = "pandoc")
 ```
 
-### Feb 27 - Mar 4
+### Feb 29 - Mar 6
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-27", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-02-29", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -483,9 +483,9 @@ p$data %>%
   kable(format = "pandoc")
 ```
 
-### Mar 5 - Mar 11
+### Mar 7 - Mar 13
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-03-05", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-03-07", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -494,9 +494,9 @@ p$data %>%
   kable(format = "pandoc")
 ```
 
-### Mar 12 - Mar 18
+### Mar 14 - Mar 20
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-03-12", duration = 7)
+p = plot_tweets(tweets, start_date = "2020-03-14", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
