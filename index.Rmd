@@ -136,7 +136,8 @@ tweets_all = tweets_temp %>%
   select(twitter_handle, time, text) %>%
   mutate(twitter_handle = tolower(twitter_handle),
          text = tolower(text)) %>%
-  filter(grepl(keywords, text))
+  filter(grepl(keywords, text)) %>%
+  rename("day" = time)
 ```
 
 find missing congressional twitter handles
@@ -178,9 +179,9 @@ congress_full = congress_info %>%
 
 congress_tweets = tweets_all %>%
   left_join(., congress_full) %>%
-  mutate(time = lubridate::as_date(time),
-         week = lubridate::floor_date(time, "week"),
-         month = lubridate::floor_date(time, "month"))
+  mutate(day = lubridate::as_date(day),
+         week = lubridate::floor_date(day, "week"),
+         month = lubridate::floor_date(day, "month"))
 
 # congress_tweets %>%
 #   filter(is.na(party)) %>%
@@ -221,15 +222,15 @@ get_tweets = function(year, fromJSON = TRUE) {
 
 trump_tweets = get_tweets(year = 2020) %>%
   mutate(twitter_handle = "realdonaldtrump",
-         time = as.POSIXct(created_at, format = "%a %b %d %H:%M:%S %z %Y"),
-         time = lubridate::as_date(time),
-         week = lubridate::floor_date(time, "week"),
-         month = lubridate::floor_date(time, "month"),
+         day = as.POSIXct(created_at, format = "%a %b %d %H:%M:%S %z %Y"),
+         day = lubridate::as_date(day),
+         week = lubridate::floor_date(day, "week"),
+         month = lubridate::floor_date(day, "month"),
          party = "trump",
          first = "D",
          last = "trump",
          title = "president") %>%
-  select(twitter_handle, text, time, week, month, party) %>%
+  select(twitter_handle, text, day, week, month, party) %>%
   filter(grepl("2020-02|2020-03", month)) %>%
   mutate(text = tolower(text)) %>%
   filter(grepl(keywords, text))
@@ -242,10 +243,82 @@ tweets = bind_rows(congress_tweets, trump_tweets)
 
 define wordcloud function
 ```{r}
-plot_tweets = function(data, party=NULL, start_date=NULL, duration=NULL, n_words=50, n_colors=6, size=20) {
+plot_number = function(data, timescale = "week", start_date = NULL, palette = palette4) {
+
+  if (!is.null(start_date)) {
+      data = data %>%
+        filter(day >= start_date)
+  }
+  
+  plot1 = data %>%
+    filter(!is.na(party)) %>%
+    ggplot(aes(!!sym(timescale), fill = party)) +
+    geom_bar(stat = "count") +
+    scale_fill_manual(name = "", values = palette) +
+    labs(x = "", y = "number of tweets\n") +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "top")
+
+  plot2 = data %>%
+    filter(!is.na(party)) %>%
+    ggplot(aes(!!sym(timescale), color = party)) +
+    geom_line(stat = "count") +
+    scale_color_manual(name = "", values = palette) +
+    labs(x = "", y = "number of tweets\n") +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "top")
+  
+  return(list(plot1 = plot1, plot2 = plot2))
+  
+}
+
+plot_sentiment = function(data, n_words = 20, 
+                          start_date = NULL, duration = NULL, 
+                          palette = palette2) {
+
+  if (!is.null(start_date)) {
+    if (!is.null(duration)) {
+      data = data %>%
+        filter(day >= start_date & day <= lubridate::date(start_date) + lubridate::days(duration))
+    } else {
+      data = data %>%
+        filter(day >= start_date)
+    }
+  }
+  
+  sentiments = data %>%
+    unnest_tokens(word, text) %>%
+    inner_join(tidytext::get_sentiments("bing")) %>%
+    anti_join(stop_words, by = "word") %>%
+    filter(!grepl(ignore_root_words, word)) %>%
+    filter(!word %in% ignore_words) %>%
+    filter(!word == "trump") %>%
+    group_by(party) %>%
+    count(word, sentiment, sort = TRUE) %>%
+    filter(party %in% c("democrat", "republican", "trump")) %>%
+    top_n(n_words) %>%
+    group_by(party) %>%
+    arrange(n) %>%
+    mutate(order = row_number())
+  
+  sentiments %>%
+    ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
+    geom_col() +
+    drlib::scale_x_reordered() +
+    facet_wrap(~party, scales = "free") +
+    labs(y = "\nnumber of times tweeted",
+         x = NULL) +
+    coord_flip() +
+    scale_fill_manual(name = "", values = palette) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "top")
+  
+}
+
+plot_content = function(data, party=NULL, start_date=NULL, duration=NULL, n_words=50, n_colors=6, size=20) {
   
   data = data %>%
-      mutate(time = lubridate::as_date(time))
+      mutate(day = lubridate::as_date(day))
   
   if (!is.null(party)) {
     data = data %>%
@@ -255,10 +328,10 @@ plot_tweets = function(data, party=NULL, start_date=NULL, duration=NULL, n_words
   if (!is.null(start_date)) {
     if (!is.null(duration)) {
       data = data %>%
-        filter(time >= start_date & time <= lubridate::date(start_date) + lubridate::days(duration))
+        filter(day >= start_date & day <= lubridate::date(start_date) + lubridate::days(duration))
     } else {
       data = data %>%
-        filter(time >= start_date)
+        filter(day >= start_date)
     }
   }
   
@@ -297,44 +370,12 @@ How many times has Congress and the President tweeted about COVID-19?
 
 ## daily
 ```{r}
-tweets %>%
-  filter(!is.na(party)) %>%
-  ggplot(aes(time, fill = party)) +
-  geom_bar(stat = "count") +
-  scale_fill_manual(name = "", values = palette4) +
-  labs(x = "", y = "number of tweets\n") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
-
-tweets %>%
-  filter(!is.na(party)) %>%
-  ggplot(aes(time, color = party)) +
-  geom_line(stat = "count") +
-  scale_color_manual(name = "", values = palette4) +
-  labs(x = "", y = "number of tweets\n") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+plot_number(tweets, timescale = "day")
 ```
 
 ## weekly
 ```{r}
-tweets %>%
-  filter(!is.na(party)) %>%
-  ggplot(aes(week, fill = party)) +
-  geom_bar(stat = "count") +
-  scale_fill_manual(name = "", values = palette4) +
-  labs(x = "", y = "number of tweets\n") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
-
-tweets %>%
-  filter(!is.na(party)) %>%
-  ggplot(aes(week, color = party)) +
-  geom_line(stat = "count") +
-  scale_color_manual(name = "", values = palette4) +
-  labs(x = "", y = "number of tweets\n") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+plot_number(tweets, timescale = "week")
 ```
 
 # sentiment of tweets {.tabset}
@@ -344,95 +385,17 @@ Here is a list of the top 20 positive or negative words for each party and the P
 
 ## overall
 ```{r, fig.width=8, fig.height=10}
-sentiments = tweets %>%
-  unnest_tokens(word, text) %>%
-  inner_join(tidytext::get_sentiments("bing")) %>%
-  anti_join(stop_words, by = "word") %>%
-  filter(!grepl(ignore_root_words, word)) %>%
-  filter(!word %in% ignore_words) %>%
-  filter(!word == "trump") %>%
-  group_by(party) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
-  #group_by(sentiment, party, month) %>%
-  top_n(20) %>%
-  group_by(party) %>%
-  arrange(n) %>%
-  mutate(order = row_number())
-
-sentiments %>%
-  ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
-  geom_col() +
-  drlib::scale_x_reordered() +
-  facet_wrap(~party, scales = "free") +
-  labs(y = "\nnumber of times tweeted",
-       x = NULL) +
-  coord_flip() +
-  scale_fill_manual(name = "", values = palette2) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+plot_sentiment(tweets)
 ```
 
 ## February
 ```{r, fig.width=8, fig.height=12}
-sentiments = tweets %>%
-  filter(month == "2020-02-01") %>%
-  unnest_tokens(word, text) %>%
-  inner_join(tidytext::get_sentiments("bing")) %>%
-  anti_join(stop_words, by = "word") %>%
-  filter(!grepl(ignore_root_words, word)) %>%
-  filter(!word %in% ignore_words) %>%
-  filter(!word == "trump") %>%
-  group_by(party) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
-  top_n(20) %>%
-  group_by(party) %>%
-  arrange(n) %>%
-  mutate(order = row_number())
-
-sentiments %>%
-  ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
-  geom_col() +
-  drlib::scale_x_reordered() +
-  facet_wrap(~party, scales = "free") +
-  labs(y = "\nnumber of times tweeted",
-       x = NULL) +
-  coord_flip() +
-  scale_fill_manual(name = "", values = palette2) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+plot_sentiment(tweets, start_date = "2020-02-01", duration = 28)
 ```
 
 ## March
 ```{r, fig.width=8, fig.height=12}
-sentiments = tweets %>%
-  filter(month == "2020-03-01") %>%
-  unnest_tokens(word, text) %>%
-  inner_join(tidytext::get_sentiments("bing")) %>%
-  anti_join(stop_words, by = "word") %>%
-  filter(!grepl(ignore_root_words, word)) %>%
-  filter(!word %in% ignore_words) %>%
-  filter(!word == "trump") %>%
-  group_by(party) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
-  top_n(20) %>%
-  group_by(party) %>%
-  arrange(n) %>%
-  mutate(order = row_number())
-
-sentiments %>%
-  ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
-  geom_col() +
-  drlib::scale_x_reordered() +
-  facet_wrap(~party, scales = "free") +
-  labs(y = "\nnumber of times tweeted",
-       x = NULL) +
-  coord_flip() +
-  scale_fill_manual(name = "", values = palette2) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "top")
+plot_sentiment(tweets, start_date = "2020-03-01", duration = 30)
 ```
 
 # content of tweets
@@ -443,7 +406,7 @@ Here are 100 the most frequently used words by each party and the President in F
 ## by month {.tabset}
 ### February
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-01", duration = 28, n_words = 100)
+p = plot_content(tweets, start_date = "2020-02-01", duration = 28, n_words = 100)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -454,7 +417,7 @@ p$data %>%
 
 ### March
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-03-01", duration = 30, n_words = 100)
+p = plot_content(tweets, start_date = "2020-03-01", duration = 30, n_words = 100)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -468,7 +431,7 @@ Here are 50 the most frequently used words by each party and the President for e
 
 ### Feb 1 - Feb 7
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-01", duration = 6)
+p = plot_content(tweets, start_date = "2020-02-01", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -479,7 +442,7 @@ p$data %>%
 
 ### Feb 8 - Feb 14
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-08", duration = 6)
+p = plot_content(tweets, start_date = "2020-02-08", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -490,7 +453,7 @@ p$data %>%
 
 ### Feb 15 - Feb 21
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-15", duration = 6)
+p = plot_content(tweets, start_date = "2020-02-15", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -501,7 +464,7 @@ p$data %>%
 
 ### Feb 22 - Feb 28
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-22", duration = 6)
+p = plot_content(tweets, start_date = "2020-02-22", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -512,7 +475,7 @@ p$data %>%
 
 ### Feb 29 - Mar 6
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-02-29", duration = 6)
+p = plot_content(tweets, start_date = "2020-02-29", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -523,7 +486,7 @@ p$data %>%
 
 ### Mar 7 - Mar 13
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-03-07", duration = 6)
+p = plot_content(tweets, start_date = "2020-03-07", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -534,7 +497,7 @@ p$data %>%
 
 ### Mar 14 - Mar 20
 ```{r, fig.width=8, fig.height=4}
-p = plot_tweets(tweets, start_date = "2020-03-14", duration = 6)
+p = plot_content(tweets, start_date = "2020-03-14", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
@@ -569,7 +532,7 @@ tweets %>%
 ```{r}
 tweets %>%
   filter(!is.na(party)) %>%
-  select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, time, text) %>%
+  select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, day, text) %>%
   arrange(twitter_handle) %>%
   unnest_tokens(word, text) %>%
   group_by(state_name, title, first, last, twitter_handle, party, gender, ethnicity) %>%
@@ -593,11 +556,11 @@ Browse the content of all tweets.
 
 ```{r}
 tweets %>%
-  select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, time, text) %>%
+  select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, day, text) %>%
   arrange(twitter_handle) %>%
   rename("state" = state_name,
          "twitter handle" = twitter_handle,
-         "date" = time) %>%
+         "date" = day) %>%
   mutate(state = as.factor(state),
          title = as.factor(title),
          party = as.factor(party),
