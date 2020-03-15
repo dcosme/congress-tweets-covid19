@@ -101,7 +101,7 @@ congress_info = full_join(congress, congress_twitter, by = c("first", "last")) %
 load congressional tweets
 
 * [Tweets of Congress, updated daily](https://github.com/alexlitel/congresstweets)
-* select tweets containing the following terms: `corona|virus|covid|flu|social distancing`
+* select tweets containing the following terms: `corona|virus|covid|flu|social distancing|pandemic`
 
 pull to update repo
 ```{bash}
@@ -111,7 +111,7 @@ git pull origin master
 
 define keywords and words to ignore
 ```{r}
-keywords = "corona|virus|covid|flu|social distancing"
+keywords = "corona|virus|covid|flu|social distancing|pandemic"
 ignore_root_words = "http|.com|img|jpg|video|live|index|[0-9]|corona|covid|vid|ncov|aspx|utm|t.co|png"
 ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s", "lr", "li", "ag")
 ```
