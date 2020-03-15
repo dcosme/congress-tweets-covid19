@@ -374,7 +374,7 @@ sentiments %>%
 ```
 
 ## February
-```{r, fig.width=8, fig.height=20}
+```{r, fig.width=8, fig.height=12}
 sentiments = tweets %>%
   filter(month == "2020-02-01") %>%
   unnest_tokens(word, text) %>%
@@ -405,7 +405,7 @@ sentiments %>%
 ```
 
 ## March
-```{r, fig.width=8, fig.height=20}
+```{r, fig.width=8, fig.height=12}
 sentiments = tweets %>%
   filter(month == "2020-03-01") %>%
   unnest_tokens(word, text) %>%
