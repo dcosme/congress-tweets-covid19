@@ -272,7 +272,7 @@ plot = data %>%
     filter(!grepl(ignore_root_words, word)) %>%
     filter(!word %in% ignore_words) %>%
     slice(1:n_words) %>%
-    mutate(word = gsub("\\.", "", word),
+    mutate(word = gsub("[[:punct:]]", "", word),
            sum = sum(n),
            size = n / sum,
            tile = ntile(n, n_colors)) %>%
