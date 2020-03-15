@@ -388,20 +388,68 @@ Here is a list of the top 20 positive or negative words for each party and the P
 plot_sentiment(tweets)
 ```
 
-## February
+## by month {.tabset}
+### February
 ```{r, fig.width=8, fig.height=12}
 plot_sentiment(tweets, start_date = "2020-02-01", duration = 28)
 ```
 
-## March
+### March
 ```{r, fig.width=8, fig.height=12}
 plot_sentiment(tweets, start_date = "2020-03-01", duration = 30)
+```
+
+## by week {.tabset}
+### Feb 1 - Feb 7
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-02-01", duration = 6)
+```
+
+### Feb 8 - Feb 14
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-02-08", duration = 6)
+```
+
+### Feb 15 - Feb 21
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-02-15", duration = 6)
+```
+
+### Feb 22 - Feb 28
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-02-22", duration = 6)
+```
+
+### Feb 29 - Mar 6
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-02-29", duration = 6)
+```
+
+### Mar 7 - Mar 13
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-03-07", duration = 6)
+```
+
+### Mar 14 - Mar 20
+```{r, fig.width=8, fig.height=6}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-03-14", duration = 6)
 ```
 
 # content of tweets
 What are Congress and the President saying about COVID-19?
 
 Here are 100 the most frequently used words by each party and the President in February and March.
+
+## overall
+```{r, fig.width=8, fig.height=4}
+p = plot_content(tweets, start_date = "2020-02-01", n_words = 100)
+p$plot
+p$data %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
+```
 
 ## by month {.tabset}
 ### February
