@@ -37,7 +37,7 @@ library(tidytext)
 library(ggwordcloud)
 library(knitr)
 library(DT)
-library(plotly)
+library(drlib)
 ```
 
 define palettes
@@ -101,12 +101,19 @@ congress_info = full_join(congress, congress_twitter, by = c("first", "last")) %
 load congressional tweets
 
 * [Tweets of Congress, updated daily](https://github.com/alexlitel/congresstweets)
-* select tweets containing the following terms: `corona|virus|covid|flu`
+* select tweets containing the following terms: `corona|virus|covid|flu|social distancing`
 
 pull to update repo
 ```{bash}
 cd ~/Documents/code/congresstweets
 git pull origin master
+```
+
+define keywords and words to ignore
+```{r}
+keywords = "corona|virus|covid|flu|social distancing"
+ignore_root_words = "http|.com|img|jpg|video|live|index|[0-9]|corona|covid|vid|ncov|aspx|utm|t.co|png"
+ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s", "lr", "li", "ag")
 ```
 
 load the files
@@ -129,7 +136,7 @@ tweets_all = tweets_temp %>%
   select(twitter_handle, time, text) %>%
   mutate(twitter_handle = tolower(twitter_handle),
          text = tolower(text)) %>%
-  filter(grepl("corona|virus|covid|flu", text))
+  filter(grepl(keywords, text))
 ```
 
 find missing congressional twitter handles
@@ -225,15 +232,12 @@ trump_tweets = get_tweets(year = 2020) %>%
   select(twitter_handle, text, time, week, month, party) %>%
   filter(grepl("2020-02|2020-03", month)) %>%
   mutate(text = tolower(text)) %>%
-  filter(grepl("corona|virus|covid|flu", text))
+  filter(grepl(keywords, text))
 ```
 
 merge tweets
 ```{r}
 tweets = bind_rows(congress_tweets, trump_tweets)
-
-ignore_root_words = "http|.com|img|jpg|video|live|index|[0-9]|corona|covid|vid|ncov|aspx|utm|t.co|png"
-ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s", "lr", "li", "ag")
 ```
 
 define wordcloud function
@@ -277,7 +281,7 @@ plot = data %>%
            size = n / sum,
            tile = ntile(n, n_colors)) %>%
     ggplot(aes(label = word, size = size, color = as.factor(tile))) +
-    geom_text_wordcloud_area(shape = "square") +
+    geom_text_wordcloud_area(shape = "square", rm_outside = TRUE) +
       scale_size_area(max_size = size, trans = power_trans(1/.7)) +
       scale_color_manual(values = palette) +
       facet_wrap(~party) +
@@ -369,30 +373,60 @@ sentiments %>%
   theme(legend.position = "top")
 ```
 
-## by month
+## February
 ```{r, fig.width=8, fig.height=20}
 sentiments = tweets %>%
+  filter(month == "2020-02-01") %>%
   unnest_tokens(word, text) %>%
   inner_join(tidytext::get_sentiments("bing")) %>%
   anti_join(stop_words, by = "word") %>%
   filter(!grepl(ignore_root_words, word)) %>%
   filter(!word %in% ignore_words) %>%
   filter(!word == "trump") %>%
-  mutate(month = ifelse(month == "2020-02-01", "february", "march")) %>%
-  group_by(party, month) %>%
+  group_by(party) %>%
   count(word, sentiment, sort = TRUE) %>%
   filter(party %in% c("democrat", "republican", "trump")) %>%
-  #group_by(sentiment, party, month) %>%
   top_n(20) %>%
-  group_by(party, month) %>%
+  group_by(party) %>%
   arrange(n) %>%
   mutate(order = row_number())
 
 sentiments %>%
-  ggplot(aes(drlib::reorder_within(word, n, c("party", "month")), n, fill = sentiment)) +
+  ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
   geom_col() +
   drlib::scale_x_reordered() +
-  facet_wrap(month~party, scales = "free") +
+  facet_wrap(~party, scales = "free") +
+  labs(y = "\nnumber of times tweeted",
+       x = NULL) +
+  coord_flip() +
+  scale_fill_manual(name = "", values = palette2) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "top")
+```
+
+## March
+```{r, fig.width=8, fig.height=20}
+sentiments = tweets %>%
+  filter(month == "2020-03-01") %>%
+  unnest_tokens(word, text) %>%
+  inner_join(tidytext::get_sentiments("bing")) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(!grepl(ignore_root_words, word)) %>%
+  filter(!word %in% ignore_words) %>%
+  filter(!word == "trump") %>%
+  group_by(party) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  filter(party %in% c("democrat", "republican", "trump")) %>%
+  top_n(20) %>%
+  group_by(party) %>%
+  arrange(n) %>%
+  mutate(order = row_number())
+
+sentiments %>%
+  ggplot(aes(drlib::reorder_within(word, n, party), n, fill = sentiment)) +
+  geom_col() +
+  drlib::scale_x_reordered() +
+  facet_wrap(~party, scales = "free") +
   labs(y = "\nnumber of times tweeted",
        x = NULL) +
   coord_flip() +
