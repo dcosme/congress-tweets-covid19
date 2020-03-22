@@ -19,7 +19,8 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 <br><br>
-**Curious what congress and Trump are saying about the coronavirus?**
+
+### What are congress and Trump are saying about the coronavirus?
 
 This analysis takes a look at the number, the positive and negative sentiment, and the content of the tweets, for each party and how that's evolving over time since February 1, 2020.
 
@@ -27,10 +28,19 @@ I utilize open data hosted online. In particular, big thanks to [Alex Litel](htt
 
 The repo for this project is: [https://github.com/dcosme/congress-tweets-covid19](https://github.com/dcosme/congress-tweets-covid19)
 
-# prep data
-load packages
 
-```{r}
+```{bash, include=FALSE}
+# load congressional tweets
+# * [Tweets of Congress, updated daily](https://github.com/alexlitel/congresstweets)
+
+# pull to update repo
+cd ~/Documents/code/congresstweets
+git pull origin master
+```
+
+```{r, include=FALSE}
+#load packages
+
 library(tidyverse)
 library(jsonlite)
 library(tidytext)
@@ -38,23 +48,19 @@ library(ggwordcloud)
 library(knitr)
 library(DT)
 library(drlib)
-```
 
-define palettes
-```{r}
+# define palettes
 palette4 = wesanderson::wes_palette("Zissou1", 4, "continuous")
 palette4 = c(palette4[1], palette4[2], palette4[4], palette4[3])
 palette5 = wesanderson::wes_palette("Zissou1", 5, "continuous")
 palette2 = c(palette5[2], palette5[4])
-```
 
-load congress twitter handles
 
-* [US Senate Information](https://github.com/CivilServiceUSA/us-senate)
-* [US House Information](https://github.com/CivilServiceUSA/us-house)
-* [Congressional Twitter Handles](https://github.com/oduwsdl/US-Congress)
+# load congress twitter handles
+# * [US Senate Information](https://github.com/CivilServiceUSA/us-senate)
+# * [US House Information](https://github.com/CivilServiceUSA/us-house)
+# * [Congressional Twitter Handles](https://github.com/oduwsdl/US-Congress)
 
-```{r}
 congress_twitter = read.csv("~/Documents/code/US-Congress/116thCongress/116Congress.csv", stringsAsFactors = FALSE) %>%
   rename("name" = Wikipedia..Names) %>%
   gather(handle_type, twitter_handle, ODU.WSDL, CSPAN, TweetCongress, Github) %>%
@@ -96,28 +102,16 @@ congress_info = full_join(congress, congress_twitter, by = c("first", "last")) %
   filter(!is.na(state_name)) %>%
   ungroup() %>%
   mutate(last = tolower(last))
-```
 
-load congressional tweets
+# define keywords and words to ignore
+# * select tweets containing the following terms: `corona|virus|covid|flu|social distancing|pandemic`
 
-* [Tweets of Congress, updated daily](https://github.com/alexlitel/congresstweets)
-* select tweets containing the following terms: `corona|virus|covid|flu|social distancing|pandemic`
-
-pull to update repo
-```{bash}
-cd ~/Documents/code/congresstweets
-git pull origin master
-```
-
-define keywords and words to ignore
-```{r}
 keywords = "corona|virus|covid|flu|social distancing|pandemic"
 ignore_root_words = "http|.com|img|jpg|video|live|index|[0-9]|corona|covid|vid|ncov|aspx|utm|t.co|png"
-ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s", "lr", "li", "ag")
-```
+ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s", "lr", "li", "ag", "media", "status")
 
-load the files
-```{r}
+# load the files
+
 file_dir = "~/Documents/code/congresstweets/data"
 file_pattern = "2020-0[2-3]{1}-.*.json"
 file_list = list.files(file_dir, pattern = file_pattern)
@@ -138,10 +132,9 @@ tweets_all = tweets_temp %>%
          text = tolower(text)) %>%
   filter(grepl(keywords, text)) %>%
   rename("day" = time)
-```
 
-find missing congressional twitter handles
-```{r}
+# find missing congressional twitter handles
+
 missing = tweets_all %>% 
   left_join(., congress_info) %>%
   filter(is.na(last)) %>%
@@ -187,14 +180,11 @@ congress_tweets = tweets_all %>%
 #   filter(is.na(party)) %>%
 #   select(twitter_handle) %>%
 #   unique()
-```
 
-load trump tweets
+# load trump tweets
+# * [Trump Tweets ](https://github.com/mkearney/trumptweets)
+# * [Trump Twitter Archive](http://trumptwitterarchive.com/)
 
-* [Trump Tweets ](https://github.com/mkearney/trumptweets)
-* [Trump Twitter Archive](http://trumptwitterarchive.com/)
-
-```{r}
 get_tweets = function(year, fromJSON = TRUE) {
   ## build and send request
   url <- paste0(
@@ -234,41 +224,46 @@ trump_tweets = get_tweets(year = 2020) %>%
   filter(grepl("2020-02|2020-03", month)) %>%
   mutate(text = tolower(text)) %>%
   filter(grepl(keywords, text))
-```
 
-merge tweets
-```{r}
-tweets = bind_rows(congress_tweets, trump_tweets)
-```
+# merge tweets
 
-define wordcloud function
-```{r}
-plot_number = function(data, timescale = "week", start_date = NULL, palette = palette4) {
+tweets = bind_rows(congress_tweets, trump_tweets) %>%
+  mutate(party = ifelse(party == "democrat", "democrats",
+                 ifelse(party == "republican", "republicans",
+                 ifelse(party == "independent", "independents", party))))
+
+# define wordcloud function
+
+plot_number = function(data, timescale = "week", start_date = NULL, palette = palette4, plot = "line") {
 
   if (!is.null(start_date)) {
       data = data %>%
         filter(day >= start_date)
   }
   
-  plot1 = data %>%
-    filter(!is.na(party)) %>%
-    ggplot(aes(!!sym(timescale), fill = party)) +
-    geom_bar(stat = "count") +
-    scale_fill_manual(name = "", values = palette) +
-    labs(x = "", y = "number of tweets\n") +
-    theme_minimal(base_size = 14) +
-    theme(legend.position = "top")
-
-  plot2 = data %>%
-    filter(!is.na(party)) %>%
-    ggplot(aes(!!sym(timescale), color = party)) +
-    geom_line(stat = "count") +
-    scale_color_manual(name = "", values = palette) +
-    labs(x = "", y = "number of tweets\n") +
-    theme_minimal(base_size = 14) +
-    theme(legend.position = "top")
+  if (plot == "line") {
+    plot = data %>%
+      filter(!is.na(party)) %>%
+      ggplot(aes(!!sym(timescale), color = party)) +
+      geom_line(stat = "count") +
+      scale_color_manual(name = "", values = palette) +
+      labs(x = "", y = "number of tweets\n") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "top")
+  }
   
-  return(list(plot1 = plot1, plot2 = plot2))
+  if (plot == "bar") {
+    plot = data %>%
+      filter(!is.na(party)) %>%
+      ggplot(aes(!!sym(timescale), fill = party)) +
+      geom_bar(stat = "count") +
+      scale_fill_manual(name = "", values = palette) +
+      labs(x = "", y = "number of tweets\n") +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "top")
+  }
+  
+  return(plot)
   
 }
 
@@ -295,7 +290,7 @@ plot_sentiment = function(data, n_words = 20,
     filter(!word == "trump") %>%
     group_by(party) %>%
     count(word, sentiment, sort = TRUE) %>%
-    filter(party %in% c("democrat", "republican", "trump")) %>%
+    filter(party %in% c("democrats", "republicans", "trump")) %>%
     top_n(n_words) %>%
     group_by(party) %>%
     arrange(n) %>%
@@ -340,7 +335,7 @@ plot_content = function(data, party=NULL, start_date=NULL, duration=NULL, n_word
   set.seed(42)
   
 plot = data %>%
-    filter(party %in% c("democrat", "republican", "trump")) %>%
+    filter(party %in% c("democrats", "republicans", "trump")) %>%
     select(text, party) %>%
     unnest_tokens(word, text) %>%
     group_by(party) %>%
@@ -370,12 +365,14 @@ How many times has Congress and the President tweeted about COVID-19?
 
 ## daily
 ```{r}
-plot_number(tweets, timescale = "day")
+plot_number(tweets, timescale = "day", plot = "bar")
+plot_number(tweets, timescale = "day", plot = "line")
 ```
 
 ## weekly
 ```{r}
-plot_number(tweets, timescale = "week")
+plot_number(tweets, timescale = "week", plot = "bar")
+plot_number(tweets, timescale = "week", plot = "line")
 ```
 
 # sentiment of tweets
@@ -390,7 +387,7 @@ plot_sentiment(tweets)
 
 ## by month {.tabset}
 ### February
-```{r, fig.width=8, fig.height=12}
+```{r, fig.width=8, fig.height=12, cache=TRUE}
 plot_sentiment(tweets, start_date = "2020-02-01", duration = 28)
 ```
 
@@ -403,37 +400,37 @@ plot_sentiment(tweets, start_date = "2020-03-01", duration = 30)
 Here is a list of the top 10 positive or negative words for each party and the President by week.
 
 ### Feb 1 - Feb 7
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-02-01", duration = 6)
 ```
 
 ### Feb 8 - Feb 14
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-02-08", duration = 6)
 ```
 
 ### Feb 15 - Feb 21
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-02-15", duration = 6)
 ```
 
 ### Feb 22 - Feb 28
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-02-22", duration = 6)
 ```
 
 ### Feb 29 - Mar 6
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-02-29", duration = 6)
 ```
 
 ### Mar 7 - Mar 13
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-03-07", duration = 6)
 ```
 
 ### Mar 14 - Mar 20
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=8, cache=TRUE}
 plot_sentiment(tweets, n_words = 10, start_date = "2020-03-14", duration = 6)
 ```
 
@@ -452,7 +449,7 @@ Here are 100 the most frequently used words by each party and the President.
 p = plot_content(tweets, start_date = "2020-02-01", n_words = 100)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
@@ -460,11 +457,11 @@ p$data %>%
 
 ## by month {.tabset}
 ### February
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-02-01", duration = 28, n_words = 100)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
@@ -475,7 +472,7 @@ p$data %>%
 p = plot_content(tweets, start_date = "2020-03-01", duration = 30, n_words = 100)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
@@ -485,77 +482,77 @@ p$data %>%
 Here are 50 the most frequently used words by each party and the President for each week in February and March.
 
 ### Feb 1 - Feb 7
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-02-01", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
 ```
 
 ### Feb 8 - Feb 14
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-02-08", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
 ```
 
 ### Feb 15 - Feb 21
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-02-15", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
 ```
 
 ### Feb 22 - Feb 28
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-02-22", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
 ```
 
 ### Feb 29 - Mar 6
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-02-29", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
 ```
 
 ### Mar 7 - Mar 13
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-03-07", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
 ```
 
 ### Mar 14 - Mar 20
-```{r, fig.width=8, fig.height=4}
+```{r, fig.width=8, fig.height=4, cache=TRUE}
 p = plot_content(tweets, start_date = "2020-03-14", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
@@ -566,7 +563,7 @@ p$data %>%
 p = plot_content(tweets, start_date = "2020-03-21", duration = 6)
 p$plot
 p$data %>%
-  filter(party %in% c("democrat", "republican", "trump")) %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
   group_by(party) %>%
   summarize(`number of tweets` = n()) %>%
   kable(format = "pandoc")
@@ -617,6 +614,7 @@ tweets %>%
 ```
 
 ## tweets
+To browse all tweets, download [all_tweets.csv](all_tweets.csv)
 ```{r}
 tweets %>%
   select(state_name, title, first, last, twitter_handle, party, gender, ethnicity, day, text) %>%
@@ -629,6 +627,6 @@ tweets %>%
          party = as.factor(party),
          gender = as.factor(gender),
          ethnicity = as.factor(ethnicity)) %>%
-  DT::datatable(filter = "top", rownames = FALSE)
+  write.csv(., "all_tweets.csv", row.names = FALSE)
 ```
 
