@@ -113,7 +113,7 @@ ignore_words = c("rt", "amp", "qt", "pu", "tag", "i'm", "it's", "i’m", "it’s
 # load the files
 
 file_dir = "~/Documents/code/congresstweets/data"
-file_pattern = "2020-0[2-3]{1}-.*.json"
+file_pattern = "2020-0[2-4]{1}-.*.json"
 file_list = list.files(file_dir, pattern = file_pattern)
 
 tweets_temp = data.frame()
@@ -221,7 +221,7 @@ trump_tweets = get_tweets(year = 2020) %>%
          last = "trump",
          title = "president") %>%
   select(twitter_handle, text, day, week, month, party) %>%
-  filter(grepl("2020-02|2020-03", month)) %>%
+  filter(grepl("2020-02|2020-03|2020-04", month)) %>%
   mutate(text = tolower(text)) %>%
   filter(grepl(keywords, text))
 
@@ -396,6 +396,11 @@ plot_sentiment(tweets, start_date = "2020-02-01", duration = 28)
 plot_sentiment(tweets, start_date = "2020-03-01", duration = 30)
 ```
 
+### April
+```{r, fig.width=8, fig.height=12}
+plot_sentiment(tweets, start_date = "2020-04-01", duration = 29)
+```
+
 ## by week {.tabset}
 Here is a list of the top 10 positive or negative words for each party and the President by week.
 
@@ -446,7 +451,7 @@ plot_sentiment(tweets, n_words = 10, start_date = "2020-03-28", duration = 6)
 
 ### Apr 4 - Apr 10
 ```{r, fig.width=8, fig.height=8}
-plot_sentiment(tweets, n_words = 10, start_date = "2020-04-0", duration = 6)
+plot_sentiment(tweets, n_words = 10, start_date = "2020-04-04", duration = 6)
 ```
 
 
@@ -481,6 +486,17 @@ p$data %>%
 ### March
 ```{r, fig.width=8, fig.height=4}
 p = plot_content(tweets, start_date = "2020-03-01", duration = 30, n_words = 100)
+p$plot
+p$data %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
+```
+
+### April
+```{r, fig.width=8, fig.height=4}
+p = plot_content(tweets, start_date = "2020-04-01", duration = 29, n_words = 100)
 p$plot
 p$data %>%
   filter(party %in% c("democrats", "republicans", "trump")) %>%
