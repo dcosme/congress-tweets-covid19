@@ -444,6 +444,12 @@ plot_sentiment(tweets, n_words = 10, start_date = "2020-03-21", duration = 6)
 plot_sentiment(tweets, n_words = 10, start_date = "2020-03-28", duration = 6)
 ```
 
+### Apr 4 - Apr 10
+```{r, fig.width=8, fig.height=8}
+plot_sentiment(tweets, n_words = 10, start_date = "2020-04-0", duration = 6)
+```
+
+
 # content of tweets
 What are Congress and the President saying about COVID-19?
 
@@ -577,6 +583,17 @@ p$data %>%
 ### Mar 28 - Apr 3
 ```{r, fig.width=8, fig.height=4}
 p = plot_content(tweets, start_date = "2020-03-28", duration = 6)
+p$plot
+p$data %>%
+  filter(party %in% c("democrats", "republicans", "trump")) %>%
+  group_by(party) %>%
+  summarize(`number of tweets` = n()) %>%
+  kable(format = "pandoc")
+```
+
+### Apr 4 - Apr 10
+```{r, fig.width=8, fig.height=4}
+p = plot_content(tweets, start_date = "2020-04-04", duration = 6)
 p$plot
 p$data %>%
   filter(party %in% c("democrats", "republicans", "trump")) %>%
